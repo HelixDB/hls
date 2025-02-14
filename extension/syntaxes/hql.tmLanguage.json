@@ -1,0 +1,224 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Helix Query",
+  "scopeName": "source.helixquery",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#query-definition"
+    },
+    {
+      "include": "#get-statement"
+    },
+    {
+      "include": "#assignment-statement"
+    },
+    {
+      "include": "#return-statement"
+    },
+    {
+      "include": "#vertex-edge-patterns"
+    },
+    {
+      "include": "#edge-patterns"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.helixquery",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "captures": {
+            "0": {
+              "name": "punctuation.definition.comment.helixquery"
+            }
+          }
+        }
+      ]
+    },
+    "query-definition": {
+      "patterns": [
+        {
+          "match": "(QUERY)\\s+(\\w+)\\s*\\((\\w+)\\s*(:)\\s*(String|Number|Boolean)\\)\\s*(=>)",
+          "captures": {
+            "1": {
+              "name": "keyword.query.helixquery"
+            },
+            "2": {
+              "name": "entity.name.function.helixquery"
+            },
+            "3": {
+              "name": "variable.other.helixquery"
+            },
+            "4": {
+              "name": "keyword.operator.scope.helixquery"
+            },
+            "5": {
+              "name": "storage.type.helixquery"
+            },
+            "6": {
+              "name": "keyword.operator.scope.helixquery"
+            }
+          }
+        },
+        {
+          "match": "(QUERY)\\s+(\\w+)\\s*(\\(\\))\\s*(=>)",
+          "captures": {
+            "1": {
+              "name": "keyword.query.helixquery"
+            },
+            "2": {
+              "name": "entity.name.function.helixquery"
+            },
+            "3": {
+              "name": "keyword.operator.scope.helixquery"
+            },
+            "4": {
+              "name": "keyword.operator.scope.helixquery"
+            }
+          }
+        }
+      ]
+    },
+    "get-statement": {
+      "match": "(GET)\\s+(\\w+)\\s*(<-)",
+      "captures": {
+        "1": {
+          "name": "keyword.query.helixquery"
+        },
+        "2": {
+          "name": "variable.other.helixquery"
+        },
+        "3": {
+          "name": "keyword.operator.scope.helixquery"
+        }
+      }
+    },
+    "assignment-statement": {
+      "match": "^\\s*(\\w+)\\s*(<-)",
+      "captures": {
+        "1": {
+          "name": "variable.other.helixquery"
+        },
+        "2": {
+          "name": "keyword.operator.scope.helixquery"
+        }
+      }
+    },
+    "return-statement": {
+      "match": "(RETURN)\\s+(\\w+)(?:\\s*,\\s*(\\w+))*",
+      "captures": {
+        "1": {
+          "name": "keyword.query.helixquery"
+        },
+        "2": {
+          "name": "variable.other.helixquery"
+        },
+        "3": {
+          "name": "variable.other.helixquery"
+        }
+      }
+    },
+    "vertex-edge-patterns": {
+      "patterns": [
+        {
+          "match": "(V|E)(::)(\\w+)(?:\\((\\w+)\\))?(::)(\\w+)(::)(\\w+)",
+          "captures": {
+            "1": {
+              "name": "support.type.builtin.helixquery"
+            },
+            "2": {
+              "name": "keyword.operator.scope.helixquery"
+            },
+            "3": {
+              "name": "entity.name.type.helixquery"
+            },
+            "4": {
+              "name": "variable.other.helixquery"
+            },
+            "5": {
+              "name": "keyword.operator.scope.helixquery"
+            },
+            "6": {
+              "name": "entity.name.type.helixquery"
+            },
+            "7": {
+              "name": "keyword.operator.scope.helixquery"
+            },
+            "8": {
+              "name": "entity.name.type.helixquery"
+            }
+          }
+        },
+        {
+          "match": "(V|E)(::)(\\w+)(?:\\((\\w+)\\))?",
+          "captures": {
+            "1": {
+              "name": "support.type.builtin.helixquery"
+            },
+            "2": {
+              "name": "keyword.operator.scope.helixquery"
+            },
+            "3": {
+              "name": "entity.name.type.helixquery"
+            },
+            "4": {
+              "name": "variable.other.helixquery"
+            }
+          }
+        }
+      ]
+    },
+    "edge-patterns": {
+      "patterns": [
+        {
+          "match": "(\\w+)(::)(In|Out)\\((\\w+)\\)(::)(\\w+)",
+          "captures": {
+            "1": {
+              "name": "variable.other.helixquery"
+            },
+            "2": {
+              "name": "keyword.operator.scope.helixquery"
+            },
+            "3": {
+              "name": "support.type.builtin.helixquery"
+            },
+            "4": {
+              "name": "entity.name.type.helixquery"
+            },
+            "5": {
+              "name": "keyword.operator.scope.helixquery"
+            },
+            "6": {
+              "name": "entity.name.type.helixquery"
+            }
+          }
+        },
+        {
+          "match": "(\\w+)(::)(In|Out)(::)(\\w+)",
+          "captures": {
+            "1": {
+              "name": "variable.other.helixquery"
+            },
+            "2": {
+              "name": "keyword.operator.scope.helixquery"
+            },
+            "3": {
+              "name": "support.type.builtin.helixquery"
+            },
+            "4": {
+              "name": "keyword.operator.scope.helixquery"
+            },
+            "5": {
+              "name": "entity.name.type.helixquery"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

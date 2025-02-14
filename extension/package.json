@@ -1,0 +1,69 @@
+{
+  "name": "helix-query-language",
+  "displayName": "Helix Query Language",
+  "description": "Language support for Helix Query Language",
+  "version": "0.1.1",
+  "engines": {
+    "vscode": "^1.63.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:helixquery"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "helixquery",
+        "aliases": [
+          "Helix Query",
+          "HQL"
+        ],
+        "extensions": [
+          ".hx",
+          ".hql"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "helixquery",
+        "scopeName": "source.helixquery",
+        "path": "./syntaxes/hql.tmLanguage.json"
+      }
+    ],
+    "semanticTokenColors": {
+      "keyword.control.query.helixquery": "#CF68E5",
+      "keyword.control.get.helixquery": "#CF68E5",
+      "keyword.control.return.helixquery": "#CF68E5",
+      "variable.declaration.helixquery": "#9CDCFE",
+      "variable.other.helixquery": "#9CDCFE",
+      "variable.parameter.helixquery": "#9CDCFE",
+      "keyword.control.vertex-edge.helixquery": "#569CD6",
+      "keyword.operator.scope.helixquery": "#D4D4D4",
+      "keyword.operator.assignment.helixquery": "#D4D4D4",
+      "keyword.operator.arrow.helixquery": "#D4D4D4",
+      "entity.name.type.helixquery": "#4EC9B0",
+      "entity.name.type.relationship.helixquery": "#4EC9B0"
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "install-extension": "code --install-extension helix-query-language-*.vsix"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^8.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^16.11.7",
+    "@types/vscode": "^1.63.0",
+    "typescript": "^4.7.2",
+    "@vscode/vsce": "^2.15.0"
+  }
+}
