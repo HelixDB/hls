@@ -2,18 +2,37 @@
   "name": "helix-query-language",
   "displayName": "Helix Query Language",
   "description": "Language support for Helix Query Language",
-  "version": "0.1.7",
-  "publisher": "helix-query",
+  "version": "0.1.9",
+  "publisher": "YOUR_PUBLISHER_ID",
   "engines": {
     "vscode": "^1.63.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Snippets",
+    "Linters"
+  ],
+  "keywords": [
+    "helixql",
+    "helix",
+    "query",
+    "database",
+    "graph",
+    "vector"
   ],
   "activationEvents": [
     "onLanguage:helixquery"
   ],
   "main": "./out/extension.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HelixDB/HLS"
+  },
+  "bugs": {
+    "url": "https://github.com/HelixDB/HLS/issues"
+  },
+  "homepage": "https://github.com/HelixDB/HLS#readme",
+  "license": "MIT",
   "contributes": {
     "languages": [
       {
@@ -36,19 +55,177 @@
         "path": "./syntaxes/hql.tmLanguage.json"
       }
     ],
-    "semanticTokenColors": {
-      "keyword.control.query.helixquery": "#CF68E5",
-      "keyword.control.get.helixquery": "#CF68E5",
-      "keyword.control.return.helixquery": "#CF68E5",
-      "variable.declaration.helixquery": "#9CDCFE",
-      "variable.other.helixquery": "#9CDCFE",
-      "variable.parameter.helixquery": "#9CDCFE",
-      "keyword.control.vertex-edge.helixquery": "#569CD6",
-      "keyword.operator.scope.helixquery": "#D4D4D4",
-      "keyword.operator.assignment.helixquery": "#D4D4D4",
-      "keyword.operator.arrow.helixquery": "#D4D4D4",
-      "entity.name.type.helixquery": "#4EC9B0",
-      "entity.name.type.relationship.helixquery": "#4EC9B0"
+    "configurationDefaults": {
+      "editor.tokenColorCustomizations": {
+        "textMateRules": [
+          {
+            "scope": "keyword.control.helixql",
+            "settings": {
+              "foreground": "#C586C0",
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "keyword.other.query.helixql",
+            "settings": {
+              "foreground": "#C586C0",
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": [
+              "keyword.other.node.helixql",
+              "keyword.other.edge.helixql",
+              "keyword.other.vector.helixql"
+            ],
+            "settings": {
+              "foreground": "#569CD6",
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "keyword.operator.traversal.helixql",
+            "settings": {
+              "foreground": "#DCDCAA",
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "keyword.operator.creation.helixql",
+            "settings": {
+              "foreground": "#4EC9B0",
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "keyword.operator.assignment.helixql",
+            "settings": {
+              "foreground": "#D4D4D4"
+            }
+          },
+          {
+            "scope": "keyword.operator.exclusion.helixql",
+            "settings": {
+              "foreground": "#FF6B6B",
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "punctuation.separator.double-colon.helixql",
+            "settings": {
+              "foreground": "#DCDCAA"
+            }
+          },
+          {
+            "scope": [
+              "punctuation.definition.generic.begin.helixql",
+              "punctuation.definition.generic.end.helixql"
+            ],
+            "settings": {
+              "foreground": "#FFFF00"
+            }
+          },
+          {
+            "scope": [
+              "punctuation.definition.parameters.begin.helixql",
+              "punctuation.definition.parameters.end.helixql"
+            ],
+            "settings": {
+              "foreground": "#DA70D6"
+            }
+          },
+          {
+            "scope": [
+              "punctuation.definition.block.begin.helixql",
+              "punctuation.definition.block.end.helixql"
+            ],
+            "settings": {
+              "foreground": "#FFD700"
+            }
+          },
+          {
+            "scope": [
+              "punctuation.definition.array.begin.helixql",
+              "punctuation.definition.array.end.helixql"
+            ],
+            "settings": {
+              "foreground": "#FF6347"
+            }
+          },
+          {
+            "scope": [
+              "variable.other.helixql",
+              "variable.other.field.helixql"
+            ],
+            "settings": {
+              "foreground": "#9CDCFE"
+            }
+          },
+          {
+            "scope": "variable.parameter.helixql",
+            "settings": {
+              "foreground": "#9CDCFE",
+              "fontStyle": "italic"
+            }
+          },
+          {
+            "scope": "variable.language.anonymous.helixql",
+            "settings": {
+              "foreground": "#808080",
+              "fontStyle": "italic"
+            }
+          },
+          {
+            "scope": "entity.name.function.helixql",
+            "settings": {
+              "foreground": "#DCDCAA"
+            }
+          },
+          {
+            "scope": "entity.name.type.helixql",
+            "settings": {
+              "foreground": "#4EC9B0"
+            }
+          },
+          {
+            "scope": [
+              "support.type.primitive.helixql",
+              "support.type.builtin.helixql"
+            ],
+            "settings": {
+              "foreground": "#569CD6"
+            }
+          },
+          {
+            "scope": "string.quoted.double.helixql",
+            "settings": {
+              "foreground": "#CE9178"
+            }
+          },
+          {
+            "scope": [
+              "constant.numeric.integer.helixql",
+              "constant.numeric.float.helixql"
+            ],
+            "settings": {
+              "foreground": "#B5CEA8"
+            }
+          },
+          {
+            "scope": "constant.language.boolean.helixql",
+            "settings": {
+              "foreground": "#569CD6"
+            }
+          },
+          {
+            "scope": "comment.line.double-slash.helixql",
+            "settings": {
+              "foreground": "#6A9955",
+              "fontStyle": "italic"
+            }
+          }
+        ]
+      }
     }
   },
   "scripts": {

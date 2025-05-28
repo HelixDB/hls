@@ -16,4 +16,3 @@ QUERY badQuery() =>
 // This should work - Product exists in this schema
 QUERY goodQuery() =>
     product <- N<Product>
-    RETURN product::{name, price} 

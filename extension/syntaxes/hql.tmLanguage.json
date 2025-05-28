@@ -18,6 +18,9 @@
       "include": "#operators"
     },
     {
+      "include": "#punctuation"
+    },
+    {
       "include": "#types"
     },
     {
@@ -153,10 +156,22 @@
         {
           "name": "keyword.operator.exclusion.helixql",
           "match": "!\\{"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.separator.double-colon.helixql",
+          "match": "::"
         },
         {
-          "name": "punctuation.separator.helixql",
-          "match": "::|\\.|,"
+          "name": "punctuation.separator.dot.helixql",
+          "match": "\\."
+        },
+        {
+          "name": "punctuation.separator.comma.helixql",
+          "match": ","
         },
         {
           "name": "punctuation.definition.generic.begin.helixql",
@@ -165,6 +180,30 @@
         {
           "name": "punctuation.definition.generic.end.helixql",
           "match": ">"
+        },
+        {
+          "name": "punctuation.definition.parameters.begin.helixql",
+          "match": "\\("
+        },
+        {
+          "name": "punctuation.definition.parameters.end.helixql",
+          "match": "\\)"
+        },
+        {
+          "name": "punctuation.definition.block.begin.helixql",
+          "match": "\\{"
+        },
+        {
+          "name": "punctuation.definition.block.end.helixql",
+          "match": "\\}"
+        },
+        {
+          "name": "punctuation.definition.array.begin.helixql",
+          "match": "\\["
+        },
+        {
+          "name": "punctuation.definition.array.end.helixql",
+          "match": "\\]"
         }
       ]
     },
@@ -190,7 +229,7 @@
               "match": "[A-Za-z_][A-Za-z0-9_]*"
             },
             {
-              "name": "punctuation.separator.helixql",
+              "name": "punctuation.separator.comma.helixql",
               "match": ","
             }
           ]
@@ -215,7 +254,7 @@
               "match": "[A-Za-z_][A-Za-z0-9_]*"
             },
             {
-              "name": "punctuation.separator.helixql",
+              "name": "punctuation.separator.comma.helixql",
               "match": ","
             }
           ]
