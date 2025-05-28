@@ -2,7 +2,7 @@
   "name": "helix-query-language",
   "displayName": "Helix Query Language",
   "description": "Language support for Helix Query Language",
-  "version": "0.1.2",
+  "version": "0.1.7",
   "publisher": "helix-query",
   "engines": {
     "vscode": "^1.63.0"
@@ -32,7 +32,7 @@
     "grammars": [
       {
         "language": "helixquery",
-        "scopeName": "source.helixquery",
+        "scopeName": "source.helixql",
         "path": "./syntaxes/hql.tmLanguage.json"
       }
     ],
@@ -57,9 +57,6 @@
     "watch": "tsc -watch -p ./",
     "package": "vsce package",
     "install-extension": "code --install-extension helix-query-language-*.vsix"
-  },
-  "dependencies": {
-    "vscode-languageclient": "^8.1.0"
   },
   "devDependencies": {
     "@types/node": "^16.11.7",

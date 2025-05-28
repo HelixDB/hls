@@ -1,348 +1,23 @@
-use std::collections::HashMap;
-
 use dashmap::DashMap;
-use pest::Parser;
-use pest_derive::Parser;
+use helixdb::helixc::{
+    analyzer::analyzer::{analyze, Diagnostic as HelixDiagnostic, DiagnosticSeverity as HelixSeverity},
+    parser::helix_parser::{Content, HxFile, HelixParser},
+};
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
 
-#[derive(Parser)]
-#[grammar = "grammar.pest"]
-pub struct HelixQueryParser;
-
-#[derive(Debug)]
-enum CompletionContext {
-    Root,
-    QueryDefinition,
-    Type,
-    ParameterType,
-    GetClause,
-    EntityType,
-    Relationship,
-    Unknown,
-}
-
-#[derive(Debug, Clone)]
-struct VariableInfo {
-    name: String,
-    var_type: String,
-    definition_range: Range,
-}
-
 #[derive(Debug)]
 struct Backend {
     client: Client,
-    document_symbols: DashMap<String, DashMap<String, Position>>,
+    documents: Arc<DashMap<Url, String>>,
 }
 
-impl Backend {
-    fn get_hover_text(&self, word: &str) -> Option<String> {
-        let keyword_docs: HashMap<&str, &str> = [
-            ("QUERY", "**QUERY** - Defines a new query operation.\n\nExample:\n```\nQUERY findPerson(name: String) => ...\n```"),
-            ("GET", "**GET** - Retrieves data from the graph.\n\nExample:\n```\nGET person <- V::Person\n```"),
-            ("RETURN", "**RETURN** - Specifies which variables to return from the query.\n\nExample:\n```\nRETURN person\n```"),
-            ("V", "**V** (Vertex) - Specifies a vertex traversal in the graph.\n\nExample:\n```\nV::Person\n```"),
-            ("E", "**E** (Edge) - Specifies an edge traversal in the graph.\n\nExample:\n```\nE::WORKS_AT\n```"),
-            ("String", "**String** - A text data type.\n\nExample:\n```\nname: String\n```"),
-            ("Integer", "**Integer** - A numeric data type that represents integers.\n\nExample:\n```\nage: Integer\n```"),
-            ("Float", "**Float** - A numeric data type that represents floating-point numbers.\n\nExample:\n```\nweight: Float\n```"),
-            ("Boolean", "**Boolean** - A logical data type that can be either true or false.\n\nExample:\n```\nactive: Boolean\n```"),
-            ("Out", "**Out** - Specifies an outgoing edge traversal.\n\nExample:\n```V::Out\n```"),
-            ("In", "**In** - Specifies an incoming edge traversal.\n\nExample:\n```V::In\n```"),
-            ("OutE", "**OutE** - Specifies an outgoing edge traversal.\n\nExample:\n```V::OutE\n```"),
-            ("InE", "**InE** - Specifies an incoming edge traversal.\n\nExample:\n```V::InE\n```"),
-        ].iter().cloned().collect();
-
-        keyword_docs.get(word).map(|&s| s.to_string())
-    }
-
-    fn get_line_until_cursor(&self, content: &str, position: &Position) -> String {
-        content
-            .lines()
-            .nth(position.line as usize)
-            .map(|line| line[..position.character as usize].to_string())
-            .unwrap_or_default()
-    }
-
-    fn get_completion_context(&self, content: &str, position: &Position) -> CompletionContext {
-        let line = self.get_line_until_cursor(content, position);
-        let trimmed = line.trim();
-        let current_line = content.lines().nth(position.line as usize).unwrap_or("");
-
-        // Ignore comments
-        if trimmed.starts_with("/*") {
-            return CompletionContext::Unknown;
-        }
-
-        if trimmed.is_empty() || trimmed.ends_with(' ') {
-            if content.contains("=>") && !content.contains("RETURN") {
-                return CompletionContext::GetClause;
-            }
-            return CompletionContext::Root;
-        }
-
-        // Query definition
-        if trimmed.starts_with("QUERY ") {
-            if trimmed.contains('(') {
-                if trimmed.contains(':') {
-                    return CompletionContext::Type;
-                }
-                return CompletionContext::ParameterType;
-            }
-            return CompletionContext::QueryDefinition;
-        }
-
-        // After => symbol
-        if current_line.contains("=>") || content.contains("=>") {
-            if trimmed.ends_with("V::") || trimmed.ends_with("E::") {
-                return CompletionContext::EntityType;
-            }
-
-            if trimmed.contains("::") && (trimmed.ends_with("::") || trimmed.ends_with("(")) {
-                return CompletionContext::Relationship;
-            }
-
-            return CompletionContext::GetClause;
-        }
-
-        CompletionContext::Unknown
-    }
-
-    fn get_completions_for_context(&self, context: CompletionContext) -> Vec<CompletionItem> {
-        match context {
-            CompletionContext::Root => vec![CompletionItem {
-                label: "QUERY".to_string(),
-                kind: Some(CompletionItemKind::KEYWORD),
-                detail: Some("Define a new query".to_string()),
-                insert_text: Some("QUERY $1($2) =>\n    GET $3 <- ".to_string()),
-                insert_text_format: Some(InsertTextFormat::SNIPPET),
-                ..Default::default()
-            }],
-            CompletionContext::Type | CompletionContext::ParameterType => vec![
-                CompletionItem {
-                    label: "String".to_string(),
-                    kind: Some(CompletionItemKind::TYPE_PARAMETER),
-                    detail: Some("String type".to_string()),
-                    ..Default::default()
-                },
-                CompletionItem {
-                    label: "Integer".to_string(),
-                    kind: Some(CompletionItemKind::TYPE_PARAMETER),
-                    detail: Some("Integer type".to_string()),
-                    ..Default::default()
-                },
-                CompletionItem {
-                    label: "Float".to_string(),
-                    kind: Some(CompletionItemKind::TYPE_PARAMETER),
-                    detail: Some("Float type".to_string()),
-                    ..Default::default()
-                },
-                CompletionItem {
-                    label: "Boolean".to_string(),
-                    kind: Some(CompletionItemKind::TYPE_PARAMETER),
-                    detail: Some("Boolean type".to_string()),
-                    ..Default::default()
-                },
-            ],
-            CompletionContext::GetClause => vec![
-                CompletionItem {
-                    label: "GET".to_string(),
-                    kind: Some(CompletionItemKind::KEYWORD),
-                    detail: Some("Retrieve data".to_string()),
-                    insert_text: Some("GET $1 <- ".to_string()),
-                    insert_text_format: Some(InsertTextFormat::SNIPPET),
-                    ..Default::default()
-                },
-                CompletionItem {
-                    label: "RETURN".to_string(),
-                    kind: Some(CompletionItemKind::KEYWORD),
-                    detail: Some("Specify return values".to_string()),
-                    insert_text: Some("RETURN $1".to_string()),
-                    insert_text_format: Some(InsertTextFormat::SNIPPET),
-                    ..Default::default()
-                },
-            ],
-            CompletionContext::EntityType => vec![
-                CompletionItem {
-                    label: "Person".to_string(),
-                    kind: Some(CompletionItemKind::CLASS),
-                    detail: Some("Person entity".to_string()),
-                    ..Default::default()
-                },
-                CompletionItem {
-                    label: "Company".to_string(),
-                    kind: Some(CompletionItemKind::CLASS),
-                    detail: Some("Company entity".to_string()),
-                    ..Default::default()
-                },
-            ],
-            CompletionContext::Relationship => vec![
-                CompletionItem {
-                    label: "In".to_string(),
-                    kind: Some(CompletionItemKind::ENUM_MEMBER),
-                    detail: Some("Incoming edge traversal".to_string()),
-                    ..Default::default()
-                },
-                CompletionItem {
-                    label: "Out".to_string(),
-                    kind: Some(CompletionItemKind::ENUM_MEMBER),
-                    detail: Some("Outgoing edge traversal".to_string()),
-                    ..Default::default()
-                },
-                CompletionItem {
-                    label: "WorksAt".to_string(),
-                    kind: Some(CompletionItemKind::ENUM_MEMBER),
-                    detail: Some("Works at relationship".to_string()),
-                    ..Default::default()
-                },
-            ],
-            _ => vec![],
-        }
-    }
-
-    fn parse_variables(&self, content: &str) -> HashMap<String, VariableInfo> {
-        let mut variables = HashMap::new();
-        let lines: Vec<&str> = content.lines().collect();
-
-        for (line_idx, line) in lines.iter().enumerate() {
-            let line = line.trim();
-
-            // Parse query parameters
-            if line.starts_with("QUERY") {
-                if let Some(params_start) = line.find('(') {
-                    if let Some(params_end) = line.find(')') {
-                        let params = &line[params_start + 1..params_end];
-                        if !params.is_empty() {
-                            let parts: Vec<&str> = params.split(':').map(|s| s.trim()).collect();
-                            if parts.len() == 2 {
-                                let var_name = parts[0].to_string();
-                                let var_type = parts[1].to_string();
-                                variables.insert(
-                                    var_name.clone(),
-                                    VariableInfo {
-                                        name: var_name,
-                                        var_type,
-                                        definition_range: Range {
-                                            start: Position::new(
-                                                line_idx as u32,
-                                                line.find(parts[0]).unwrap_or(0) as u32,
-                                            ),
-                                            end: Position::new(
-                                                line_idx as u32,
-                                                (line.find(parts[1]).unwrap_or(0) + parts[1].len())
-                                                    as u32,
-                                            ),
-                                        },
-                                    },
-                                );
-                            }
-                        }
-                    }
-                }
-                continue;
-            }
-
-            // Parse RETURN statement to include multiple variables
-            if line.starts_with("RETURN") {
-                let return_vars = line.split("RETURN").nth(1).unwrap_or("").split(',');
-                for var_name in return_vars {
-                    let var_name = var_name.trim();
-                    if !var_name.is_empty() && !variables.contains_key(var_name) {
-                        variables.insert(
-                            var_name.to_string(),
-                            VariableInfo {
-                                name: var_name.to_string(),
-                                var_type: "Unknown".to_string(),
-                                definition_range: Range {
-                                    start: Position::new(
-                                        line_idx as u32,
-                                        line.find(var_name).unwrap_or(0) as u32,
-                                    ),
-                                    end: Position::new(
-                                        line_idx as u32,
-                                        (line.find(var_name).unwrap_or(0) + var_name.len()) as u32,
-                                    ),
-                                },
-                            },
-                        );
-                    }
-                }
-                continue;
-            }
-
-            // Parse variable assignments
-            if line.contains("<-") {
-                let parts: Vec<&str> = line.split("<-").collect();
-                if let Some(var_part) = parts.first() {
-                    let var_name = if var_part.trim().starts_with("GET") {
-                        var_part.trim().split("GET").nth(1).unwrap_or("").trim()
-                    } else {
-                        var_part.trim()
-                    };
-
-                    if !var_name.is_empty() {
-                        if let Some(pattern) = parts.get(1) {
-                            let pattern = pattern.trim();
-
-                            let var_type =
-                                if pattern.starts_with("V::") || pattern.starts_with("E::") {
-                                    pattern.split("::").nth(1).unwrap_or("Unknown").to_string()
-                                } else {
-                                    pattern.split("::").last().unwrap_or("Unknown").to_string()
-                                };
-
-                            variables.insert(
-                                var_name.to_string(),
-                                VariableInfo {
-                                    name: var_name.to_string(),
-                                    var_type,
-                                    definition_range: Range {
-                                        start: Position::new(
-                                            line_idx as u32,
-                                            line.find(var_name).unwrap_or(0) as u32,
-                                        ),
-                                        end: Position::new(
-                                            line_idx as u32,
-                                            (line.find(var_name).unwrap_or(0) + var_name.len())
-                                                as u32,
-                                        ),
-                                    },
-                                },
-                            );
-                        }
-                    }
-                }
-            }
-        }
-
-        variables
-    }
-    fn get_word_at_position(&self, content: &str, position: &Position) -> Option<String> {
-        let lines: Vec<&str> = content.lines().collect();
-        if let Some(line) = lines.get(position.line as usize) {
-            let char_pos = position.character as usize;
-            if char_pos >= line.len() {
-                return None;
-            }
-
-            let before = &line[..=char_pos];
-            let after = &line[char_pos..];
-
-            let word_start = before
-                .rfind(|c: char| !c.is_alphanumeric() && c != '_')
-                .map(|i| i + 1)
-                .unwrap_or(0);
-            let word_end = char_pos
-                + after
-                    .find(|c: char| !c.is_alphanumeric() && c != '_')
-                    .unwrap_or(after.len());
-
-            Some(line[word_start..word_end].to_string())
-        } else {
-            None
-        }
-    }
+#[derive(Debug, Deserialize, Serialize)]
+struct InlayHintParams {
+    path: String,
 }
 
 #[tower_lsp::async_trait]
@@ -351,38 +26,26 @@ impl LanguageServer for Backend {
         Ok(InitializeResult {
             capabilities: ServerCapabilities {
                 text_document_sync: Some(TextDocumentSyncCapability::Kind(
-                    TextDocumentSyncKind::INCREMENTAL,
+                    TextDocumentSyncKind::FULL,
                 )),
-                completion_provider: Some(CompletionOptions {
-                    resolve_provider: Some(true),
-                    trigger_characters: Some(vec![
-                        " ".to_string(),
-                        ":".to_string(),
-                        "(".to_string(),
-                        ",".to_string(),
-                    ]),
-                    work_done_progress_options: Default::default(),
-                    all_commit_characters: None,
-                    completion_item: Some(CompletionOptionsCompletionItem {
-                        label_details_support: Some(true),
-                    }),
-                }),
                 hover_provider: Some(HoverProviderCapability::Simple(true)),
-                definition_provider: Some(OneOf::Left(true)),
-                references_provider: Some(OneOf::Left(true)),
-
-                ..ServerCapabilities::default()
+                // Remove diagnostic provider for now to avoid method not found errors
+                // diagnostic_provider: Some(DiagnosticServerCapabilities::Options(
+                //     DiagnosticOptions {
+                //         inter_file_dependencies: true,
+                //         workspace_diagnostics: true,
+                //         ..Default::default()
+                //     },
+                // )),
+                ..Default::default()
             },
-            server_info: None,
+            ..Default::default()
         })
     }
 
     async fn initialized(&self, _: InitializedParams) {
         self.client
-            .log_message(
-                MessageType::INFO,
-                "Helix Query Language Server initialised!",
-            )
+            .log_message(MessageType::INFO, "HelixQL LSP initialized!")
             .await;
     }
 
@@ -390,82 +53,254 @@ impl LanguageServer for Backend {
         Ok(())
     }
 
-    async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
-        let uri = params.text_document_position.text_document.uri;
-        let position = params.text_document_position.position;
-
-        if let Ok(content) = std::fs::read_to_string(uri.path()) {
-            let context = self.get_completion_context(&content, &position);
-            let items = self.get_completions_for_context(context);
-            return Ok(Some(CompletionResponse::Array(items)));
-        }
-
-        Ok(None)
-    }
-
-    async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
-        let position = params.text_document_position_params.position;
-        let uri = params.text_document_position_params.text_document.uri;
-
-        if let Ok(content) = std::fs::read_to_string(uri.path()) {
-            if let Some(word) = self.get_word_at_position(&content, &position) {
-                if let Some(hover_text) = self.get_hover_text(&word) {
-                    return Ok(Some(Hover {
-                        contents: HoverContents::Markup(MarkupContent {
-                            kind: MarkupKind::Markdown,
-                            value: hover_text,
-                        }),
-                        range: None,
-                    }));
-                }
-
-                let variables = self.parse_variables(&content);
-                if let Some(var_info) = variables.get(&word) {
-                    return Ok(Some(Hover {
-                        contents: HoverContents::Markup(MarkupContent {
-                            kind: MarkupKind::Markdown,
-                            value: format!(
-                                "**Variable**: {}\n**Type**: {}",
-                                var_info.name, var_info.var_type
-                            ),
-                        }),
-                        range: Some(var_info.definition_range),
-                    }));
-                }
-            }
-        }
-
-        Ok(None)
+    async fn did_open(&self, params: DidOpenTextDocumentParams) {
+        let uri = params.text_document.uri;
+        let text = params.text_document.text;
+        
+        // Log file opening for debugging
+        self.client
+            .log_message(MessageType::INFO, format!("Opening file: {}", uri.path()))
+            .await;
+        
+        // Store document
+        self.documents.insert(uri.clone(), text.clone());
+        
+        // Run diagnostics
+        self.run_diagnostics(&uri).await;
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        self.validate_document(&params.text_document.uri, &params.content_changes[0].text)
+        let uri = params.text_document.uri;
+        if let Some(changes) = params.content_changes.first() {
+            self.documents.insert(uri.clone(), changes.text.clone());
+            self.run_diagnostics(&uri).await;
+        }
+    }
+
+    async fn did_save(&self, params: DidSaveTextDocumentParams) {
+        // Re-run diagnostics on save
+        self.run_diagnostics(&params.text_document.uri).await;
+    }
+
+    async fn did_close(&self, params: DidCloseTextDocumentParams) {
+        self.documents.remove(&params.text_document.uri);
+        // Clear diagnostics for closed file
+        self.client
+            .publish_diagnostics(params.text_document.uri, vec![], None)
             .await;
     }
 
-    async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        self.validate_document(&params.text_document.uri, &params.text_document.text)
-            .await;
+    async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position;
+        
+        // Get document content
+        let content = match self.documents.get(&uri) {
+            Some(doc) => doc.clone(),
+            None => return Ok(None),
+        };
+        
+        // Simple hover for now - can be enhanced with type information from analyzer
+        let lines: Vec<&str> = content.lines().collect();
+        if let Some(line) = lines.get(position.line as usize) {
+            let hover_text = self.get_hover_info(line, position.character as usize);
+            if let Some(text) = hover_text {
+                return Ok(Some(Hover {
+                    contents: HoverContents::Markup(MarkupContent {
+                        kind: MarkupKind::Markdown,
+                        value: text,
+                    }),
+                    range: None,
+                }));
+            }
+        }
+        
+        Ok(None)
     }
 }
 
 impl Backend {
-    fn create_diagnostic_from_error(err: pest::error::Error<Rule>) -> Diagnostic {
-        let error_location = match err.line_col {
-            pest::error::LineColLocation::Pos((line, col)) => (line, col),
-            pest::error::LineColLocation::Span((line, col), _) => (line, col),
+    async fn run_diagnostics(&self, uri: &Url) {
+        // Log diagnostic run for debugging
+        self.client
+            .log_message(MessageType::INFO, format!("Running diagnostics for: {}", uri.path()))
+            .await;
+            
+        // Get the directory of the current file
+        let current_dir = std::path::Path::new(uri.path())
+            .parent()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| "/".to_string());
+            
+        self.client
+            .log_message(MessageType::INFO, format!("Analyzing files in directory: {}", current_dir))
+            .await;
+            
+        // Collect all .hx and .hql files in the SAME DIRECTORY as the opened file
+        let files: Vec<HxFile> = self.documents
+            .iter()
+            .filter_map(|entry| {
+                let file_uri = entry.key();
+                let file_content = entry.value();
+                
+                // Get the directory of this file
+                let file_dir = std::path::Path::new(file_uri.path())
+                    .parent()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "/".to_string());
+                
+                // Only include .hx and .hql files from the same directory
+                if (file_uri.path().ends_with(".hx") || file_uri.path().ends_with(".hql")) 
+                    && file_dir == current_dir {
+                    Some(HxFile {
+                        name: file_uri.path().to_string(),
+                        content: file_content.clone(),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if files.is_empty() {
+            self.client
+                .log_message(MessageType::INFO, format!("No .hx or .hql files found in directory: {}", current_dir))
+                .await;
+            return;
+        }
+
+        self.client
+            .log_message(MessageType::INFO, format!("Analyzing {} files in directory: {}", files.len(), current_dir))
+            .await;
+
+        // Create content structure (like CLI)
+        let content = Content {
+            content: String::new(),
+            source: Default::default(),
+            files,
         };
 
-        let range = Range {
-            start: Position::new((error_location.0 - 1) as u32, (error_location.1 - 1) as u32),
-            end: Position::new((error_location.0 - 1) as u32, error_location.1 as u32),
-        };
+        // Parse and analyze (like CLI)
+        match HelixParser::parse_source(&content) {
+            Ok(parsed) => {
+                let (diagnostics, _) = analyze(&parsed);
+                
+                self.client
+                    .log_message(MessageType::INFO, format!("Found {} diagnostics", diagnostics.len()))
+                    .await;
+                
+                // Group diagnostics by file path
+                let mut diags_by_file: std::collections::HashMap<String, Vec<Diagnostic>> = 
+                    std::collections::HashMap::new();
+                
+                for diag in diagnostics {
+                    // Get the file path from the diagnostic
+                    let file_path = diag.filepath.as_ref()
+                        .or_else(|| diag.location.filepath.as_ref())
+                        .cloned()
+                        .unwrap_or_else(|| "unknown".to_string());
+                    
+                    let lsp_diag = self.convert_diagnostic(&diag);
+                    diags_by_file.entry(file_path).or_default().push(lsp_diag);
+                }
+                
+                // Clear diagnostics for all files in the same directory first, then publish new ones
+                for entry in self.documents.iter() {
+                    let file_uri = entry.key();
+                    
+                    // Get the directory of this file
+                    let file_dir = std::path::Path::new(file_uri.path())
+                        .parent()
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "/".to_string());
+                    
+                    // Only publish diagnostics for files in the same directory
+                    if (file_uri.path().ends_with(".hx") || file_uri.path().ends_with(".hql")) 
+                        && file_dir == current_dir {
+                        let file_path = file_uri.path().to_string();
+                        let diagnostics = diags_by_file.get(&file_path).cloned().unwrap_or_default();
+                        
+                        self.client
+                            .publish_diagnostics(file_uri.clone(), diagnostics, None)
+                            .await;
+                    }
+                }
+            }
+            Err(e) => {
+                // Parser error - publish to files in the same directory
+                let error_message = format!("Parse error: {}", e);
+                
+                self.client
+                    .log_message(MessageType::ERROR, error_message.clone())
+                    .await;
+                
+                let diagnostic = Diagnostic {
+                    range: Range::new(Position::new(0, 0), Position::new(0, 1)),
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    message: error_message,
+                    source: Some("helixql".to_string()),
+                    ..Default::default()
+                };
+                
+                // Publish parse error to files in the same directory
+                for entry in self.documents.iter() {
+                    let file_uri = entry.key();
+                    
+                    // Get the directory of this file
+                    let file_dir = std::path::Path::new(file_uri.path())
+                        .parent()
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "/".to_string());
+                    
+                    // Only publish errors to files in the same directory
+                    if (file_uri.path().ends_with(".hx") || file_uri.path().ends_with(".hql")) 
+                        && file_dir == current_dir {
+                        self.client
+                            .publish_diagnostics(file_uri.clone(), vec![diagnostic.clone()], None)
+                            .await;
+                    }
+                }
+            }
+        }
+    }
 
+    fn convert_diagnostic(&self, diag: &HelixDiagnostic) -> Diagnostic {
+        // Get line and column information from the location
+        // Assuming Loc has start and end with line/column fields
+        // Adjust these based on your actual Loc structure
+        
+        // LSP uses 0-based line and column indices
+        // If your analyzer uses 1-based indices, subtract 1
+        let start_line = diag.location.start.line.saturating_sub(1) as u32;
+        let start_col = diag.location.start.column.saturating_sub(1) as u32;
+        let end_line = diag.location.end.line.saturating_sub(1) as u32;
+        let end_col = diag.location.end.column.saturating_sub(1) as u32;
+        
+        // Convert severity
+        let severity = match diag.severity {
+            HelixSeverity::Error => Some(DiagnosticSeverity::ERROR),
+            HelixSeverity::Warning => Some(DiagnosticSeverity::WARNING),
+            HelixSeverity::Info => Some(DiagnosticSeverity::INFORMATION),
+            HelixSeverity::Hint => Some(DiagnosticSeverity::HINT),
+            HelixSeverity::Empty => None,
+        };
+        
+        // Build the diagnostic message
+        let mut message = diag.message.clone();
+        if let Some(hint) = &diag.hint {
+            message.push_str("\n\n");
+            message.push_str("Hint: ");
+            message.push_str(hint);
+        }
+        
         Diagnostic {
-            range,
-            severity: Some(DiagnosticSeverity::ERROR),
-            message: err.to_string(),
-            source: Some("helix-query-lsp".to_string()),
+            range: Range::new(
+                Position::new(start_line, start_col),
+                Position::new(end_line, end_col),
+            ),
+            severity,
+            message,
+            source: Some("helixql".to_string()),
             code: None,
             code_description: None,
             tags: None,
@@ -473,34 +308,104 @@ impl Backend {
             data: None,
         }
     }
-
-    async fn validate_document(&self, uri: &Url, content: &str) {
-        let diagnostics = match HelixQueryParser::parse(Rule::source, content) {
-            Ok(_) => Vec::new(),
-            Err(err) => {
-                let diagnostic = Self::create_diagnostic_from_error(err);
-                vec![diagnostic]
+    
+    fn get_hover_info(&self, line: &str, char_pos: usize) -> Option<String> {
+        // Enhanced hover information
+        let hover_map = vec![
+            // Creation operations
+            ("AddN", "**AddN\\<Type\\>** - Create a new node\n\n```helixql\nAddN<User>({name: \"Alice\"})\n```"),
+            ("AddE", "**AddE\\<Type\\>** - Create a new edge\n\n```helixql\nAddE<Follows>::From(user1)::To(user2)\n```"),
+            ("AddV", "**AddV\\<Type\\>** - Add a vector\n\n```helixql\nAddV<Document>(vector, {content: \"text\"})\n```"),
+            
+            // Traversal operations
+            ("Out", "**Out\\<EdgeType\\>** - Traverse outgoing edges to connected nodes"),
+            ("In", "**In\\<EdgeType\\>** - Traverse incoming edges to connected nodes"),
+            ("OutE", "**OutE\\<EdgeType\\>** - Get outgoing edges"),
+            ("InE", "**InE\\<EdgeType\\>** - Get incoming edges"),
+            ("FromN", "**FromN** - Get the source node of an edge"),
+            ("ToN", "**ToN** - Get the target node of an edge"),
+            
+            // Filtering and conditions
+            ("WHERE", "**WHERE** - Filter elements based on conditions\n\n```helixql\n::WHERE(_::{age}::GT(18))\n```"),
+            ("EXISTS", "**EXISTS** - Check if traversal has results\n\n```helixql\nEXISTS(_::Out<Follows>)\n```"),
+            ("AND", "**AND** - Logical AND operation"),
+            ("OR", "**OR** - Logical OR operation"),
+            
+            // Comparison operations
+            ("GT", "**GT** - Greater than"),
+            ("GTE", "**GTE** - Greater than or equal"),
+            ("LT", "**LT** - Less than"),
+            ("LTE", "**LTE** - Less than or equal"),
+            ("EQ", "**EQ** - Equal to"),
+            ("NEQ", "**NEQ** - Not equal to"),
+            
+            // Other operations
+            ("COUNT", "**COUNT** - Count the number of elements"),
+            ("UPDATE", "**UPDATE** - Update properties of elements"),
+            ("DROP", "**DROP** - Delete elements from the graph"),
+            ("RANGE", "**RANGE** - Get a range of elements"),
+            ("SearchV", "**SearchV** - Search for vectors"),
+            
+            // Types
+            ("String", "**String** - Text data type"),
+            ("Boolean", "**Boolean** - True/false value"),
+            ("I8", "**I8** - 8-bit signed integer (-128 to 127)"),
+            ("I16", "**I16** - 16-bit signed integer"),
+            ("I32", "**I32** - 32-bit signed integer"),
+            ("I64", "**I64** - 64-bit signed integer"),
+            ("U8", "**U8** - 8-bit unsigned integer (0 to 255)"),
+            ("U16", "**U16** - 16-bit unsigned integer"),
+            ("U32", "**U32** - 32-bit unsigned integer"),
+            ("U64", "**U64** - 64-bit unsigned integer"),
+            ("U128", "**U128** - 128-bit unsigned integer"),
+            ("F32", "**F32** - 32-bit floating point"),
+            ("F64", "**F64** - 64-bit floating point"),
+            ("ID", "**ID** - UUID identifier"),
+            ("Date", "**Date** - Date/timestamp value"),
+            
+            // Keywords
+            ("QUERY", "**QUERY** - Define a query function"),
+            ("RETURN", "**RETURN** - Specify query output"),
+            ("FOR", "**FOR** - Loop over a collection"),
+            ("IN", "**IN** - Part of FOR loop syntax"),
+            ("INDEX", "**INDEX** - Mark a field as indexed"),
+            ("DEFAULT", "**DEFAULT** - Set default value for a field"),
+        ];
+        
+        // Find the word at the cursor position
+        let start = line[..char_pos.min(line.len())]
+            .rfind(|c: char| !c.is_alphanumeric() && c != '_')
+            .map(|i| i + 1)
+            .unwrap_or(0);
+        
+        let end = line[char_pos..]
+            .find(|c: char| !c.is_alphanumeric() && c != '_')
+            .map(|i| char_pos + i)
+            .unwrap_or(line.len());
+        
+        if start < end {
+            let word = &line[start..end];
+            
+            for (keyword, info) in hover_map {
+                if word == keyword {
+                    return Some(info.to_string());
+                }
             }
-        };
-
-        self.client
-            .publish_diagnostics(uri.clone(), diagnostics, None)
-            .await;
+        }
+        
+        None
     }
 }
 
 #[tokio::main]
 async fn main() {
-    env_logger::init();
-
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
-
-    let (service, socket) = LspService::build(|client| Backend {
+    
+    let (service, socket) = LspService::new(|client| Backend {
         client,
-        document_symbols: DashMap::new(),
-    })
-    .finish();
-
+        documents: Arc::new(DashMap::new()),
+    });
+    
     Server::new(stdin, stdout, socket).serve(service).await;
 }
