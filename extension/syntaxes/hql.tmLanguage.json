@@ -1,222 +1,265 @@
 {
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-  "name": "Helix Query",
-  "scopeName": "source.helixquery",
+  "name": "HelixQL",
+  "scopeName": "source.helixql",
   "patterns": [
-    {
-      "include": "#comments"
-    },
-    {
-      "include": "#query-definition"
-    },
-    {
-      "include": "#get-statement"
-    },
-    {
-      "include": "#assignment-statement"
-    },
-    {
-      "include": "#return-statement"
-    },
-    {
-      "include": "#vertex-edge-patterns"
-    },
-    {
-      "include": "#edge-patterns"
-    }
+    { "include": "#comments" },
+    { "include": "#schema-definitions" },
+    { "include": "#query-definitions" },
+    { "include": "#keywords" },
+    { "include": "#types" },
+    { "include": "#operators" },
+    { "include": "#literals" },
+    { "include": "#identifiers" }
   ],
   "repository": {
     "comments": {
       "patterns": [
         {
-          "name": "comment.block.helixquery",
-          "begin": "/\\*",
-          "end": "\\*/",
-          "captures": {
-            "0": {
-              "name": "punctuation.definition.comment.helixquery"
+          "name": "comment.line.double-slash.helixql",
+          "begin": "//",
+          "end": "$",
+          "patterns": [
+            {
+              "name": "constant.character.escape.helixql",
+              "match": "\\\\."
             }
+          ]
+        }
+      ]
+    },
+    "schema-definitions": {
+      "patterns": [
+        {
+          "name": "meta.schema.node.helixql",
+          "begin": "\\b(N)::(\\w+)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.other.schema.helixql" },
+            "2": { "name": "entity.name.type.node.helixql" }
+          },
+          "end": "\\}",
+          "patterns": [
+            { "include": "#field-definitions" },
+            { "include": "#comments" }
+          ]
+        },
+        {
+          "name": "meta.schema.edge.helixql",
+          "begin": "\\b(E)::(\\w+)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.other.schema.helixql" },
+            "2": { "name": "entity.name.type.edge.helixql" }
+          },
+          "end": "\\}",
+          "patterns": [
+            { "include": "#edge-properties" },
+            { "include": "#comments" }
+          ]
+        },
+        {
+          "name": "meta.schema.vector.helixql",
+          "begin": "\\b(V)::(\\w+)\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.other.schema.helixql" },
+            "2": { "name": "entity.name.type.vector.helixql" }
+          },
+          "end": "\\}",
+          "patterns": [
+            { "include": "#field-definitions" },
+            { "include": "#comments" }
+          ]
+        }
+      ]
+    },
+    "field-definitions": {
+      "patterns": [
+        {
+          "name": "meta.field.indexed.helixql",
+          "match": "\\b(INDEX)\\s+(\\w+)\\s*:\\s*([A-Z]\\w*|\\[[A-Z]\\w*\\])",
+          "captures": {
+            "1": { "name": "keyword.other.index.helixql" },
+            "2": { "name": "variable.other.field.helixql" },
+            "3": { "name": "entity.name.type.helixql" }
+          }
+        },
+        {
+          "name": "meta.field.default.helixql",
+          "match": "\\b(\\w+)\\s*:\\s*([A-Z]\\w*|\\[[A-Z]\\w*\\])\\s+(DEFAULT)\\s+(.+?)(?=,|\\})",
+          "captures": {
+            "1": { "name": "variable.other.field.helixql" },
+            "2": { "name": "entity.name.type.helixql" },
+            "3": { "name": "keyword.other.default.helixql" },
+            "4": { "name": "constant.other.default-value.helixql" }
+          }
+        },
+        {
+          "name": "meta.field.helixql",
+          "match": "\\b(\\w+)\\s*:\\s*([A-Z]\\w*|\\[[A-Z]\\w*\\])",
+          "captures": {
+            "1": { "name": "variable.other.field.helixql" },
+            "2": { "name": "entity.name.type.helixql" }
           }
         }
       ]
     },
-    "query-definition": {
+    "edge-properties": {
       "patterns": [
         {
-          "match": "(QUERY)\\s+(\\w+)\\s*\\((\\w+)\\s*(:)\\s*(String|Number|Boolean)\\)\\s*(=>)",
+          "match": "\\b(From|To)\\s*:\\s*(\\w+)",
           "captures": {
-            "1": {
-              "name": "keyword.query.helixquery"
-            },
-            "2": {
-              "name": "entity.name.function.helixquery"
-            },
-            "3": {
-              "name": "variable.other.helixquery"
-            },
-            "4": {
-              "name": "keyword.operator.scope.helixquery"
-            },
-            "5": {
-              "name": "storage.type.helixquery"
-            },
-            "6": {
-              "name": "keyword.operator.scope.helixquery"
-            }
+            "1": { "name": "keyword.other.edge-direction.helixql" },
+            "2": { "name": "entity.name.type.helixql" }
           }
         },
         {
-          "match": "(QUERY)\\s+(\\w+)\\s*(\\(\\))\\s*(=>)",
+          "name": "meta.properties.helixql",
+          "begin": "\\b(Properties)\\s*:\\s*\\{",
+          "beginCaptures": {
+            "1": { "name": "keyword.other.properties.helixql" }
+          },
+          "end": "\\}",
+          "patterns": [
+            { "include": "#field-definitions" },
+            { "include": "#comments" }
+          ]
+        }
+      ]
+    },
+    "query-definitions": {
+      "patterns": [
+        {
+          "name": "meta.query.helixql",
+          "begin": "\\b(QUERY)\\s+(\\w+)\\s*\\(",
+          "beginCaptures": {
+            "1": { "name": "keyword.other.query.helixql" },
+            "2": { "name": "entity.name.function.query.helixql" }
+          },
+          "end": "\\)\\s*(=>)",
+          "endCaptures": {
+            "1": { "name": "keyword.operator.arrow.helixql" }
+          },
+          "patterns": [
+            { "include": "#parameters" },
+            { "include": "#comments" }
+          ]
+        }
+      ]
+    },
+    "parameters": {
+      "patterns": [
+        {
+          "name": "meta.parameter.helixql",
+          "match": "\\b(\\w+)\\s*:\\s*([A-Z]\\w*|\\[[A-Z]\\w*\\])",
           "captures": {
-            "1": {
-              "name": "keyword.query.helixquery"
-            },
-            "2": {
-              "name": "entity.name.function.helixquery"
-            },
-            "3": {
-              "name": "keyword.operator.scope.helixquery"
-            },
-            "4": {
-              "name": "keyword.operator.scope.helixquery"
-            }
+            "1": { "name": "variable.parameter.helixql" },
+            "2": { "name": "entity.name.type.helixql" }
           }
         }
       ]
     },
-    "get-statement": {
-      "match": "(GET)\\s+(\\w+)\\s*(<-)",
-      "captures": {
-        "1": {
-          "name": "keyword.query.helixquery"
-        },
-        "2": {
-          "name": "variable.other.helixquery"
-        },
-        "3": {
-          "name": "keyword.operator.scope.helixquery"
-        }
-      }
-    },
-    "assignment-statement": {
-      "match": "^\\s*(\\w+)\\s*(<-)",
-      "captures": {
-        "1": {
-          "name": "variable.other.helixquery"
-        },
-        "2": {
-          "name": "keyword.operator.scope.helixquery"
-        }
-      }
-    },
-    "return-statement": {
-      "match": "(RETURN)\\s+(\\w+)(?:\\s*,\\s*(\\w+))*",
-      "captures": {
-        "1": {
-          "name": "keyword.query.helixquery"
-        },
-        "2": {
-          "name": "variable.other.helixquery"
-        },
-        "3": {
-          "name": "variable.other.helixquery"
-        }
-      }
-    },
-    "vertex-edge-patterns": {
+    "keywords": {
       "patterns": [
         {
-          "match": "(V|E)(::)(\\w+)(?:\\((\\w+)\\))?(::)(\\w+)(::)(\\w+)",
-          "captures": {
-            "1": {
-              "name": "support.type.builtin.helixquery"
-            },
-            "2": {
-              "name": "keyword.operator.scope.helixquery"
-            },
-            "3": {
-              "name": "entity.name.type.helixquery"
-            },
-            "4": {
-              "name": "variable.other.helixquery"
-            },
-            "5": {
-              "name": "keyword.operator.scope.helixquery"
-            },
-            "6": {
-              "name": "entity.name.type.helixquery"
-            },
-            "7": {
-              "name": "keyword.operator.scope.helixquery"
-            },
-            "8": {
-              "name": "entity.name.type.helixquery"
-            }
-          }
+          "name": "keyword.control.helixql",
+          "match": "\\b(RETURN|FOR|IN|WHERE|EXISTS|AND|OR|IF|ELSE)\\b"
         },
         {
-          "match": "(V|E)(::)(\\w+)(?:\\((\\w+)\\))?",
+          "name": "keyword.other.operation.helixql",
+          "match": "\\b(AddN|AddE|AddV|BatchAddV|SearchV|DROP|UPDATE|COUNT|RANGE)\\b"
+        },
+        {
+          "name": "keyword.other.traversal.helixql",
+          "match": "\\b(Out|In|OutE|InE|FromN|ToN|ShortestPath)\\b"
+        },
+        {
+          "name": "keyword.other.comparison.helixql",
+          "match": "\\b(GT|GTE|LT|LTE|EQ|NEQ)\\b"
+        },
+        {
+          "name": "keyword.other.special.helixql",
+          "match": "\\b(ID|NONE|NOW|PREFILTER|DEFAULT|INDEX)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "entity.name.type.primitive.helixql",
+          "match": "\\b(String|Boolean|F32|F64|I8|I16|I32|I64|U8|U16|U32|U64|U128|Date|ID)\\b"
+        },
+        {
+          "name": "entity.name.type.array.helixql",
+          "match": "\\[([A-Z]\\w*)\\]",
           "captures": {
-            "1": {
-              "name": "support.type.builtin.helixquery"
-            },
-            "2": {
-              "name": "keyword.operator.scope.helixquery"
-            },
-            "3": {
-              "name": "entity.name.type.helixquery"
-            },
-            "4": {
-              "name": "variable.other.helixquery"
-            }
+            "1": { "name": "entity.name.type.primitive.helixql" }
           }
         }
       ]
     },
-    "edge-patterns": {
+    "operators": {
       "patterns": [
         {
-          "match": "(\\w+)(::)(In|Out)\\((\\w+)\\)(::)(\\w+)",
-          "captures": {
-            "1": {
-              "name": "variable.other.helixquery"
-            },
-            "2": {
-              "name": "keyword.operator.scope.helixquery"
-            },
-            "3": {
-              "name": "support.type.builtin.helixquery"
-            },
-            "4": {
-              "name": "entity.name.type.helixquery"
-            },
-            "5": {
-              "name": "keyword.operator.scope.helixquery"
-            },
-            "6": {
-              "name": "entity.name.type.helixquery"
-            }
-          }
+          "name": "keyword.operator.assignment.helixql",
+          "match": "<-"
         },
         {
-          "match": "(\\w+)(::)(In|Out)(::)(\\w+)",
-          "captures": {
-            "1": {
-              "name": "variable.other.helixquery"
-            },
-            "2": {
-              "name": "keyword.operator.scope.helixquery"
-            },
-            "3": {
-              "name": "support.type.builtin.helixquery"
-            },
-            "4": {
-              "name": "keyword.operator.scope.helixquery"
-            },
-            "5": {
-              "name": "entity.name.type.helixquery"
+          "name": "keyword.operator.traversal.helixql",
+          "match": "::"
+        },
+        {
+          "name": "keyword.operator.anonymous.helixql",
+          "match": "_"
+        },
+        {
+          "name": "keyword.operator.closure.helixql",
+          "match": "\\|"
+        },
+        {
+          "name": "keyword.operator.spread.helixql",
+          "match": "\\.\\."
+        },
+        {
+          "name": "keyword.operator.exclude.helixql",
+          "match": "!"
+        }
+      ]
+    },
+    "literals": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.helixql",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.helixql",
+              "match": "\\\\."
             }
-          }
+          ]
+        },
+        {
+          "name": "constant.numeric.float.helixql",
+          "match": "\\b\\d+\\.\\d+\\b"
+        },
+        {
+          "name": "constant.numeric.integer.helixql",
+          "match": "\\b\\d+\\b"
+        },
+        {
+          "name": "constant.language.boolean.helixql",
+          "match": "\\b(true|false)\\b"
+        }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        {
+          "name": "entity.name.type.uppercase.helixql",
+          "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+        },
+        {
+          "name": "variable.other.helixql",
+          "match": "\\b[a-z][A-Za-z0-9_]*\\b"
         }
       ]
     }

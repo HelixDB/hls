@@ -2,7 +2,8 @@
   "name": "helix-query-language",
   "displayName": "Helix Query Language",
   "description": "Language support for Helix Query Language",
-  "version": "0.1.1",
+  "version": "0.1.2",
+  "publisher": "helix-query",
   "engines": {
     "vscode": "^1.63.0"
   },
