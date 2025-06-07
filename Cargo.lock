@@ -645,6 +645,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "get_routes"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.91",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -769,13 +778,14 @@ dependencies = [
 
 [[package]]
 name = "helixdb"
-version = "0.1.0"
+version = "1.0.85"
 dependencies = [
  "bincode",
  "chrono",
  "colored",
  "dirs",
  "flume",
+ "get_routes",
  "heed3",
  "inventory",
  "itertools",

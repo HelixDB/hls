@@ -3,7 +3,7 @@
   "displayName": "Helix Query Language",
   "description": "Language support for Helix Query Language",
   "version": "0.1.9",
-  "publisher": "YOUR_PUBLISHER_ID",
+  "publisher": "helix-query",
   "engines": {
     "vscode": "^1.63.0"
   },
