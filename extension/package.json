@@ -1,9 +1,10 @@
 {
-  "name": "helix-query-language",
-  "displayName": "Helix Query Language",
+  "name": "HelixQL",
+  "displayName": "HelixQL",
   "description": "Language support for Helix Query Language",
-  "version": "0.1.9",
-  "publisher": "helix-query",
+  "version": "0.1.10",
+  "publisher": "HelixDB",
+  "icon": "icon.png",
   "engines": {
     "vscode": "^1.63.0"
   },
@@ -21,7 +22,9 @@
     "vector"
   ],
   "activationEvents": [
-    "onLanguage:helixquery"
+    "onLanguage:helixquery",
+    "onLanguage:hql",
+    "onLanguage:hx"
   ],
   "main": "./out/extension.js",
   "repository": {
@@ -108,6 +111,42 @@
             "settings": {
               "foreground": "#FF6B6B",
               "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "keyword.operator.spread.helixql",
+            "settings": {
+              "foreground": "#DCDCAA"
+            }
+          },
+          {
+            "scope": "meta.annotation.helixql",
+            "settings": {
+              "foreground": "#808080"
+            }
+          },
+          {
+            "scope": "support.function.math.helixql",
+            "settings": {
+              "foreground": "#4EC9B0"
+            }
+          },
+          {
+            "scope": "constant.language.order.helixql",
+            "settings": {
+              "foreground": "#C586C0"
+            }
+          },
+          {
+            "scope": "punctuation.definition.closure.helixql",
+            "settings": {
+              "foreground": "#DCDCAA"
+            }
+          },
+          {
+            "scope": "constant.other.schema-version.helixql",
+            "settings": {
+              "foreground": "#569CD6"
             }
           },
           {
@@ -234,6 +273,9 @@
     "watch": "tsc -watch -p ./",
     "package": "vsce package",
     "install-extension": "code --install-extension helix-query-language-*.vsix"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
     "@types/node": "^16.11.7",

@@ -6,7 +6,13 @@
       "include": "#comments"
     },
     {
+      "include": "#annotations"
+    },
+    {
       "include": "#schema-definitions"
+    },
+    {
+      "include": "#schema-version"
     },
     {
       "include": "#query-definitions"
@@ -16,6 +22,12 @@
     },
     {
       "include": "#operators"
+    },
+    {
+      "include": "#math-functions"
+    },
+    {
+      "include": "#closure-pipes"
     },
     {
       "include": "#punctuation"
@@ -39,6 +51,22 @@
         {
           "name": "comment.line.double-slash.helixql",
           "match": "//.*$"
+        }
+      ]
+    },
+    "annotations": {
+      "patterns": [
+        {
+          "name": "meta.annotation.helixql",
+          "match": "#\\[[^\\]]*\\]"
+        }
+      ]
+    },
+    "schema-version": {
+      "patterns": [
+        {
+          "name": "constant.other.schema-version.helixql",
+          "match": "\\bschema::\\d+\\b"
         }
       ]
     },
@@ -86,7 +114,12 @@
               "name": "entity.name.function.helixql"
             }
           },
-          "end": "(?==>)",
+          "end": "(=>)",
+          "endCaptures": {
+            "1": {
+              "name": "keyword.operator.assignment.helixql"
+            }
+          },
           "patterns": [
             {
               "include": "#query-parameters"
@@ -131,7 +164,7 @@
       "patterns": [
         {
           "name": "keyword.control.helixql",
-          "match": "\\b(RETURN|WHERE|DROP|FOR|IN|EXISTS|AND|OR|NONE)\\b"
+          "match": "\\b(RETURN|WHERE|DROP|FOR|IN|EXISTS|AND|OR|NONE|MIGRATION|FIRST|AS|UNIQUE)\\b"
         },
         {
           "name": "keyword.operator.assignment.helixql",
@@ -140,6 +173,14 @@
         {
           "name": "keyword.other.property.helixql",
           "match": "\\b(From|To|Properties|INDEX|DEFAULT|NOW)\\b"
+        },
+        {
+          "name": "keyword.operator.spread.helixql",
+          "match": "\\.\\."
+        },
+        {
+          "name": "constant.language.order.helixql",
+          "match": "\\b(Asc|Desc)\\b"
         }
       ]
     },
@@ -147,15 +188,31 @@
       "patterns": [
         {
           "name": "keyword.operator.traversal.helixql",
-          "match": "::(Out|In|OutE|InE|FromN|ToN|ShortestPath|COUNT|RANGE|UPDATE|ID|WHERE|GT|GTE|LT|LTE|EQ|NEQ|PREFILTER)\\b"
+          "match": "::(Out|In|OutE|InE|FromN|ToN|FromV|ToV|From|To|ShortestPath|ShortestPathBFS|ShortestPathDijkstras|ShortestPathAStar|COUNT|RANGE|UPDATE|ID|WHERE|GT|GTE|LT|LTE|EQ|NEQ|CONTAINS|IS_IN|PREFILTER|AGGREGATE_BY|GROUP_BY|ORDER)\\b"
         },
         {
           "name": "keyword.operator.creation.helixql",
-          "match": "\\b(AddN|AddE|AddV|BatchAddV|SearchV)\\b"
+          "match": "\\b(AddN|AddE|AddV|BatchAddV|SearchV|SearchBM25|Embed|UpsertN|UpsertE|UpsertV|RerankRRF|RerankMMR)\\b"
         },
         {
           "name": "keyword.operator.exclusion.helixql",
           "match": "!\\{"
+        }
+      ]
+    },
+    "math-functions": {
+      "patterns": [
+        {
+          "name": "support.function.math.helixql",
+          "match": "\\b(ADD|SUB|MUL|DIV|POW|MOD|ABS|SQRT|LN|LOG10|LOG|EXP|CEIL|FLOOR|ROUND|SIN|COS|TAN|ASIN|ACOS|ATAN|ATAN2|PI|E|MIN|MAX|SUM|AVG)\\b"
+        }
+      ]
+    },
+    "closure-pipes": {
+      "patterns": [
+        {
+          "name": "punctuation.definition.closure.helixql",
+          "match": "\\|[A-Za-z_][A-Za-z0-9_]*\\|"
         }
       ]
     },
@@ -175,11 +232,11 @@
         },
         {
           "name": "punctuation.definition.generic.begin.helixql",
-          "match": "<"
+          "match": "<(?!-)"
         },
         {
           "name": "punctuation.definition.generic.end.helixql",
-          "match": ">"
+          "match": "(?<!=)>"
         },
         {
           "name": "punctuation.definition.parameters.begin.helixql",
@@ -225,6 +282,9 @@
           },
           "patterns": [
             {
+              "include": "#keywords"
+            },
+            {
               "name": "variable.other.field.helixql",
               "match": "[A-Za-z_][A-Za-z0-9_]*"
             },
@@ -249,6 +309,9 @@
             }
           },
           "patterns": [
+            {
+              "include": "#keywords"
+            },
             {
               "name": "variable.other.field.helixql",
               "match": "[A-Za-z_][A-Za-z0-9_]*"
