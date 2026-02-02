@@ -375,6 +375,171 @@ impl Backend {
         }
     }
 
+    /// Get hover info for a field within an object access context (::{ })
+    fn get_field_context_hover(
+        &self,
+        uri: &Url,
+        position: Position,
+        field_name: &str,
+    ) -> Option<String> {
+        let doc = self.documents.get(uri)?;
+        let lines: Vec<&str> = doc.lines().collect();
+        let line = lines.get(position.line as usize)?;
+        let char_idx = position.character as usize;
+
+        if char_idx > line.len() {
+            return None;
+        }
+
+        let before_cursor = &line[..char_idx];
+
+        // Check if we're inside ::{ } by finding last "::{" before cursor
+        if let Some(brace_pos) = before_cursor.rfind("::{") {
+            // Check no unmatched "}" between "::{" and cursor
+            let between = &before_cursor[brace_pos + 3..];
+            if between.contains('}') {
+                return None; // We've exited the object access
+            }
+
+            // We're inside an object access - find the context type
+            // Search for N<Type>, E<Type>, or V<Type> pattern before the "::{"
+            let search_area = &before_cursor[..brace_pos];
+
+            // Use a simple reverse search for the pattern
+            if let Some((kind, type_name)) = self.find_context_type(search_area) {
+                // Look up the field in the schema
+                if let Some((field_type, full_type_path)) =
+                    self.lookup_field_in_schema(uri, &kind, &type_name, field_name)
+                {
+                    return Some(format!("**{}**: {} (from {})", field_name, field_type, full_type_path));
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Find the context type (N<Type>, E<Type>, or V<Type>) in a string
+    fn find_context_type(&self, text: &str) -> Option<(String, String)> {
+        // Search backwards for the most recent N<...>, E<...>, or V<...> pattern
+        let mut best_match: Option<(usize, String, String)> = None;
+
+        for pattern_char in ['N', 'E', 'V'] {
+            let pattern = format!("{}<", pattern_char);
+            if let Some(start) = text.rfind(&pattern) {
+                let after_bracket = &text[start + 2..];
+                if let Some(end) = after_bracket.find('>') {
+                    let type_name = &after_bracket[..end];
+                    // Only accept valid identifiers
+                    if !type_name.is_empty() && type_name.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                        if best_match.is_none() || start > best_match.as_ref().unwrap().0 {
+                            best_match = Some((start, pattern_char.to_string(), type_name.to_string()));
+                        }
+                    }
+                }
+            }
+        }
+
+        best_match.map(|(_, kind, name)| (kind, name))
+    }
+
+    /// Look up a field type from a schema type
+    fn lookup_field_in_schema(
+        &self,
+        uri: &Url,
+        type_kind: &str, // "N", "E", or "V"
+        type_name: &str,
+        field_name: &str,
+    ) -> Option<(String, String)> // Returns (field_type, full_type_path)
+    {
+        let dir_key = uri
+            .to_file_path()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.to_string_lossy().to_string()))?;
+
+        let source = self.parsed_cache.get(&dir_key)?;
+
+        // Check for built-in fields first
+        match type_kind {
+            "N" => {
+                // Built-in node fields
+                match field_name {
+                    "id" => return Some(("Uuid".to_string(), format!("N::{}", type_name))),
+                    "label" => return Some(("String".to_string(), format!("N::{}", type_name))),
+                    _ => {}
+                }
+            }
+            "E" => {
+                // Built-in edge fields
+                match field_name {
+                    "id" => return Some(("Uuid".to_string(), format!("E::{}", type_name))),
+                    "label" => return Some(("String".to_string(), format!("E::{}", type_name))),
+                    "from_node" => return Some(("Uuid".to_string(), format!("E::{}", type_name))),
+                    "to_node" => return Some(("Uuid".to_string(), format!("E::{}", type_name))),
+                    _ => {}
+                }
+            }
+            "V" => {
+                // Built-in vector fields
+                match field_name {
+                    "id" => return Some(("Uuid".to_string(), format!("V::{}", type_name))),
+                    "label" => return Some(("String".to_string(), format!("V::{}", type_name))),
+                    "data" => return Some(("[F64]".to_string(), format!("V::{}", type_name))),
+                    "score" => return Some(("F64".to_string(), format!("V::{}", type_name))),
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+
+        // Search in schema definitions
+        for (_version, schema) in &source.schema {
+            match type_kind {
+                "N" => {
+                    for node in &schema.node_schemas {
+                        if node.name.1 == type_name {
+                            for field in &node.fields {
+                                if field.name == field_name {
+                                    let type_str = Self::field_type_to_string(&field.field_type);
+                                    return Some((type_str, format!("N::{}", type_name)));
+                                }
+                            }
+                        }
+                    }
+                }
+                "E" => {
+                    for edge in &schema.edge_schemas {
+                        if edge.name.1 == type_name {
+                            if let Some(props) = &edge.properties {
+                                for field in props {
+                                    if field.name == field_name {
+                                        let type_str = Self::field_type_to_string(&field.field_type);
+                                        return Some((type_str, format!("E::{}", type_name)));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "V" => {
+                    for vector in &schema.vector_schemas {
+                        if vector.name == type_name {
+                            for field in &vector.fields {
+                                if field.name == field_name {
+                                    let type_str = Self::field_type_to_string(&field.field_type);
+                                    return Some((type_str, format!("V::{}", type_name)));
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        None
+    }
+
     /// Get variable type from assignment context
     fn get_variable_type(&self, uri: &Url, position: Position, word: &str) -> Option<String> {
         let dir_key = uri
@@ -1062,6 +1227,17 @@ impl LanguageServer for Backend {
                     contents: HoverContents::Markup(MarkupContent {
                         kind: MarkupKind::Markdown,
                         value: param_info,
+                    }),
+                    range: None,
+                }));
+            }
+
+            // Check if it's a field in an object access context (::{ })
+            if let Some(field_info) = self.get_field_context_hover(uri, position, &word) {
+                return Ok(Some(Hover {
+                    contents: HoverContents::Markup(MarkupContent {
+                        kind: MarkupKind::Markdown,
+                        value: field_info,
                     }),
                     range: None,
                 }));

@@ -2,7 +2,7 @@
   "name": "HelixQL",
   "displayName": "HelixQL",
   "description": "Language support for Helix Query Language",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "publisher": "HelixDB",
   "icon": "icon.png",
   "engines": {
